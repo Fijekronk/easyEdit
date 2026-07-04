@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Large media — raw inputs, references, renders (not for the repo)
+/samples/
+/output/
+/*.mp4
+/*.mov
+/*.zip
+/*.docx
+
+# keep the pipeline assets (assets/ is intentionally tracked)

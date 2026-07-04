@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Boost Video Editor</title>
+<style>
+  :root{--teal:#05a4ab;--navy:#16324f;--grey:#f2f5f7;--line:#d6dee6;--red:#e8554e;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--grey);color:var(--navy);}
+  .wrap{max-width:1100px;margin:0 auto;padding:34px 18px 90px;}
+  h1{font-size:26px;margin:0 0 4px;} .sub{color:#5b6b7a;margin:0 0 22px;}
+  .card{background:#fff;border-radius:14px;padding:24px;margin-bottom:20px;box-shadow:0 6px 24px rgba(22,50,79,.08);}
+  h2{font-size:17px;margin:0 0 14px;}
+  label{display:block;font-weight:600;margin:12px 0 6px;font-size:13px;}
+  input[type=text],input[type=number],select{padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;}
+  input[type=text]{width:100%;} input[type=number]{width:90px;}
+  .drop{border:2px dashed #c4d0db;border-radius:11px;padding:22px;text-align:center;color:#5b6b7a;cursor:pointer;}
+  .drop:hover,.drop.over{border-color:var(--teal);background:#f0fbfb;color:var(--teal);}
+  button{padding:9px 14px;border:0;border-radius:9px;background:var(--teal);color:#fff;font-size:14px;font-weight:700;cursor:pointer;}
+  button.sec{background:#e6edf2;color:var(--navy);} button.tiny{padding:6px 10px;font-size:12px;}
+  button.active{outline:3px solid rgba(5,164,171,.3);}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+  button.big{width:100%;padding:14px;font-size:16px;margin-top:16px;}
+  .bar{height:10px;background:#e3eaf0;border-radius:6px;overflow:hidden;margin-top:8px;}
+  .bar>i{display:block;height:100%;width:0;background:var(--teal);transition:width .4s;}
+  .pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;background:#e3eaf0;}
+  .pill.done{background:#d6f5e8;color:#0a8a52;}.pill.error{background:#fde2e2;color:#c0392b;}.pill.queued{background:#fff0d6;color:#a9730a;}
+  a.dl{display:inline-block;margin-top:6px;padding:10px 18px;background:var(--navy);color:#fff;text-decoration:none;border-radius:9px;font-weight:700;}
+  .muted{color:#8595a3;font-size:12px;}
+
+  /* preview + stage */
+  .pvwrap{padding:14px;background:#d7dee6;border-radius:12px;}   /* grey mat shows the video frame edges */
+  .preview{position:relative;width:100%;background:#000;border-radius:6px;overflow:hidden;
+           border:2px solid var(--navy);box-shadow:0 2px 10px rgba(22,50,79,.25);}
+  .preview video{display:block;width:100%;}
+  .stage{position:absolute;inset:0;}
+  .obox{position:absolute;border:1px dashed transparent;cursor:move;user-select:none;}
+  .obox.sel{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal);}
+  .obox .lbl{white-space:pre;line-height:1.1;text-shadow:0 0 3px rgba(0,0,0,.6);font-weight:700;}
+  .obox img{display:block;width:100%;height:100%;pointer-events:none;}
+  .obox .grip{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;background:var(--teal);border:2px solid #fff;border-radius:50%;cursor:nwse-resize;}
+
+  /* toolbar */
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;}
+  .toolbar .gap{flex:1;}
+  .clock{font-variant-numeric:tabular-nums;font-weight:700;}
+
+  /* timeline */
+  .tl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fafcfd;}
+  .tlinner{position:relative;}
+  .ruler{position:relative;height:22px;border-bottom:1px solid var(--line);}
+  .ruler .tick{position:absolute;top:0;height:22px;border-left:1px solid #cfdae3;font-size:10px;color:#90a1b0;padding-left:3px;}
+  .track{position:relative;height:54px;background:#eaf6f7;border-bottom:1px solid var(--line);}
+  .track .fill{position:absolute;top:6px;bottom:6px;left:0;right:0;background:linear-gradient(180deg,#bfe9ec,#a6dfe3);border-radius:5px;}
+  .trim-dim{position:absolute;top:0;bottom:0;background:rgba(22,50,79,.32);z-index:3;pointer-events:none;}
+  .handle{position:absolute;top:0;bottom:0;width:10px;background:var(--navy);z-index:5;cursor:ew-resize;border-radius:3px;}
+  .cutreg{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,rgba(232,85,78,.55),rgba(232,85,78,.55) 6px,rgba(232,85,78,.35) 6px,rgba(232,85,78,.35) 12px);z-index:4;border-left:2px solid var(--red);border-right:2px solid var(--red);}
+  .cutreg b{position:absolute;top:2px;right:2px;background:var(--red);color:#fff;border-radius:50%;width:16px;height:16px;font-size:11px;line-height:16px;text-align:center;cursor:pointer;}
+  .playhead{position:absolute;top:0;bottom:0;width:2px;background:#e8554e;z-index:7;pointer-events:none;}
+  .playhead .grab{position:absolute;top:-6px;left:-8px;width:18px;height:18px;background:#e8554e;
+                  border-radius:4px;cursor:ew-resize;pointer-events:auto;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .lane{position:relative;height:40px;background:#f6f9fb;}
+  .clip{position:absolute;top:6px;height:28px;background:var(--teal);color:#fff;border-radius:5px;font-size:11px;
+        padding:5px 8px;white-space:nowrap;overflow:hidden;cursor:move;z-index:2;display:flex;align-items:center;}
+  .clip.img{background:#7a5cd8;} .clip.sel{outline:2px solid #fff;box-shadow:0 0 0 2px var(--navy);}
+  .clip .e{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;} .clip .e.l{left:0;} .clip .e.r{right:0;}
+
+  .insp{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;}
+  .insp .f{display:flex;flex-direction:column;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Boost Video Editor</h1>
+  <p class="sub">Upload a raw Loom lesson → clean branded 1920×1080 video → visual editor.</p>
+
+  <!-- RENDER -->
+  <div class="card" id="uploadCard">
+    <h2>1 · Render</h2>
+    <div style="margin-bottom:12px;font-size:13px;">
+      <b>Encoder:</b>
+      <button class="sec tiny" id="encCpu">CPU</button>
+      <button class="sec tiny" id="encGpu">GPU (NVENC)</button>
+      <span class="muted" id="encNote"></span>
+    </div>
+    <form id="form">
+      <label>Raw Loom video(s) — you can pick several; they render one by one</label>
+      <label class="drop" id="drop" for="file"><b>Click to choose</b> or drop .mp4 files here<div id="fname" class="muted"></div></label>
+      <input type="file" id="file" accept="video/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;" />
+      <button type="submit" id="go" class="big" disabled>Add to render queue</button>
+    </form>
+    <div id="jobsList" style="margin-top:16px"></div>
+  </div>
+
+  <!-- EDITOR -->
+  <div class="card" id="editorCard" hidden>
+    <h2>2 · Visual editor</h2>
+    <div class="pvwrap">
+      <div class="preview" id="preview">
+        <video id="vid" playsinline></video>
+        <div class="stage" id="stage"></div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button class="sec" id="playBtn">▶ Play</button>
+      <span class="clock" id="clock">0:00.0</span> / <span class="clock muted" id="dur">0:00.0</span>
+      <span class="gap"></span>
+      <button class="sec" id="addText">+ Text</button>
+      <button class="sec" id="addImage">+ Image</button>
+      <input type="file" id="imgFile" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;">
+      <button class="sec" id="toolSelect">🖱 Select</button>
+      <button class="sec" id="toolCut">✂ Cut</button>
+      <span class="gap"></span>
+      <button class="sec tiny" id="zoomOut">– zoom</button>
+      <button class="sec tiny" id="zoomIn">zoom +</button>
+    </div>
+
+    <div class="tl" id="tl">
+      <div class="tlinner" id="tlinner">
+        <div class="ruler" id="ruler"></div>
+        <div class="track" id="vtrack">
+          <div class="fill"></div>
+          <div class="trim-dim" id="dimL"></div>
+          <div class="trim-dim" id="dimR"></div>
+          <div id="cuts"></div>
+          <div class="handle" id="trimL"></div>
+          <div class="handle" id="trimR"></div>
+          <div class="playhead" id="ph"><div class="grab" id="phGrab"></div></div>
+        </div>
+        <div class="lane" id="lane"></div>
+      </div>
+    </div>
+    <p class="muted">Drag the dark handles to <b>trim</b>. Pick <b>✂ Cut</b> then drag on the track to remove a span.
+       Drag overlays on the video to move; drag their corner to resize; drag their coloured clip to re-time.</p>
+
+    <div class="insp" id="insp"></div>
+
+    <button class="big" id="apply">Apply &amp; render</button>
+    <div id="editPanel" style="margin-top:14px" hidden>
+      <span class="pill" id="epill">queued</span><span id="emsg"></span>
+      <div class="bar"><i id="efill"></i></div>
+    </div>
+    <div id="editResult" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const fmt=t=>{t=Math.max(0,t);const m=Math.floor(t/60),s=(t%60);return m+":"+(s<10?"0":"")+s.toFixed(1);};
+
+/* ============ ENCODER TOGGLE ============ */
+async function loadEncoder(){
+  const j=await(await fetch("/api/encoder")).json();
+  $("#encGpu").disabled=!j.gpu_available;
+  $("#encNote").textContent=j.gpu_available?"(GPU speeds the main encodes; background pass stays multi-core CPU)":"(no NVENC GPU detected)";
+  paintEnc(j.encoder);
+}
+function paintEnc(mode){ $("#encCpu").classList.toggle("active",mode==="cpu"); $("#encGpu").classList.toggle("active",mode==="gpu"); }
+async function setEnc(mode){ const r=await fetch("/api/encoder",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({encoder:mode})}); if(r.ok){paintEnc((await r.json()).encoder);} }
+$("#encCpu").onclick=()=>setEnc("cpu"); $("#encGpu").onclick=()=>setEnc("gpu"); loadEncoder();
+
+/* ============ RENDER QUEUE ============ */
+const fileInput=$("#file"),drop=$("#drop"),go=$("#go");
+let chosenFiles=[];
+function pick(files){
+  chosenFiles=Array.from(files||[]);
+  $("#fname").textContent=chosenFiles.length?chosenFiles.map(f=>f.name).join(", "):"";
+  go.disabled=!chosenFiles.length;
+}
+fileInput.onchange=e=>pick(e.target.files);   // label[for] opens the dialog natively
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>{if(e.dataTransfer.files.length)pick(e.dataTransfer.files);});
+
+$("#form").onsubmit=async e=>{
+  e.preventDefault(); go.disabled=true;
+  for(const f of chosenFiles){
+    const fd=new FormData(); fd.append("file",f);   // output named after the file
+    try{
+      const {id}=await (await fetch("/api/jobs",{method:"POST",body:fd})).json();
+      addJobRow(id, f.name);
+    }catch(err){ /* ignore individual failures */ }
+  }
+  chosenFiles=[]; $("#fname").textContent=""; fileInput.value="";
+};
+
+function addJobRow(id,name){
+  if($(`[data-job="${id}"]`)) return;          // avoid duplicates
+  const row=document.createElement("div");
+  row.className="chip"; row.style.display="block"; row.dataset.job=id;
+  row.innerHTML=
+    `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+       <b data-name style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></b>
+       <span style="display:flex;gap:8px;align-items:center">
+         <span class="pill" data-pill>queued</span>
+         <button class="sec tiny" data-remove title="remove">×</button></span></div>
+     <div class="bar" style="margin-top:6px"><i data-fill></i></div>
+     <div data-msg class="muted" style="margin-top:4px"></div>
+     <div data-actions style="margin-top:6px"></div>`;
+  row.querySelector("[data-name]").textContent=name;
+  row.querySelector("[data-remove]").onclick=async()=>{
+    try{ await fetch(`/api/jobs/${id}`,{method:"DELETE"}); }catch(e){}
+    row.remove();
+  };
+  $("#jobsList").prepend(row);
+  pollRow(id,row);
+}
+
+// restore the job list from the server on load (survives page refresh)
+(async()=>{
+  try{
+    const jobs=await (await fetch("/api/jobs")).json();
+    jobs.forEach(j=>addJobRow(j.id, j.title));   // oldest→newest; prepend puts newest on top
+  }catch(e){}
+})();
+
+async function pollRow(id,row){
+  let r,j;
+  try{ r=await fetch(`/api/jobs/${id}`); }
+  catch(e){ setTimeout(()=>pollRow(id,row),2000); return; }
+  if(r.status===404){            // server was restarted — job no longer in memory
+    const pill=row.querySelector("[data-pill]"); pill.className="pill error"; pill.textContent="expired";
+    row.querySelector("[data-msg]").textContent="Job no longer available (server restarted). Re-render it.";
+    return;
+  }
+  j=await r.json();
+  const pill=row.querySelector("[data-pill]"); pill.className="pill "+j.status;
+  pill.textContent = j.status==="queued"
+      ? (j.queue_position>0?`in queue · ${j.queue_position} ahead`:"next up")
+      : (j.status==="running"?"rendering":j.status);
+  row.querySelector("[data-msg]").textContent = j.status==="running"?j.message:"";
+  row.querySelector("[data-fill]").style.width=(j.progress*100)+"%";
+  if(j.status==="done"){
+    row.querySelector("[data-actions]").innerHTML=
+      `<a class="dl" href="${j.download}">⬇ Download</a>
+       <button class="sec" style="margin-left:8px" data-edit>Open in editor</button>`;
+    row.querySelector("[data-edit]").onclick=()=>openEditor(id);
+    return;
+  }
+  if(j.status==="error"){ row.querySelector("[data-msg]").textContent=j.error||"error"; return; }
+  setTimeout(()=>pollRow(id,row),1400);
+}
+
+/* edit-job poller (used by the editor's Apply button) */
+async function pollJob(id,p,onDone){
+  const j=await(await fetch(`/api/jobs/${id}`)).json();
+  const pill=$("#"+p+"pill");pill.className="pill "+j.status;
+  let label=j.status;
+  if(j.status==="queued")label=j.queue_position>0?`in queue · ${j.queue_position} ahead`:"next up";
+  pill.textContent=label;
+  $("#"+p+"msg").textContent=" "+(j.status==="running"?j.message:"");
+  $("#"+p+"fill").style.width=(j.progress*100)+"%";
+  if(j.status==="done"){onDone(j);return;}
+  if(j.status==="error"){$("#"+p+"msg").textContent=" "+(j.error||"error");$("#apply").disabled=false;return;}
+  setTimeout(()=>pollJob(id,p,onDone),1400);
+}
+
+/* ============ VISUAL EDITOR ============ */
+const vid=$("#vid"),stage=$("#stage"),tlinner=$("#tlinner");
+let S=null;            // editor state
+let sourceJob=null, tool="select", pps=10, selId=null, uid=0;
+
+function openEditor(jobId){
+  sourceJob=jobId;
+  $("#editorCard").hidden=false;
+  vid.src=`/api/jobs/${jobId}/stream?_=`+Date.now();
+  $("#editResult").innerHTML="";
+  vid.onloadedmetadata=()=>{
+    S={duration:vid.duration,trim:{start:0,end:vid.duration},cuts:[],overlays:[]};
+    selId=null; pps=Math.max(4,Math.min(40,900/vid.duration));
+    $("#dur").textContent=fmt(vid.duration);
+    layout(); renderAll();
+    $("#editorCard").scrollIntoView({behavior:"smooth"});
+  };
+}
+const vscale=()=>1920/stage.clientWidth;   // video px per screen px
+
+/* ---- playback ---- */
+$("#playBtn").onclick=()=>{vid.paused?vid.play():vid.pause();};
+vid.addEventListener("play",()=>$("#playBtn").textContent="⏸ Pause");
+vid.addEventListener("pause",()=>$("#playBtn").textContent="▶ Play");
+vid.addEventListener("timeupdate",()=>{ if(scrubbing)return; $("#clock").textContent=fmt(vid.currentTime);movePlayhead();renderStage();});
+
+/* ---- tools / zoom ---- */
+function setTool(t){tool=t;$("#toolSelect").classList.toggle("active",t==="select");$("#toolCut").classList.toggle("active",t==="cut");}
+$("#toolSelect").onclick=()=>setTool("select"); $("#toolCut").onclick=()=>setTool("cut"); setTool("select");
+$("#zoomIn").onclick=()=>{pps=Math.min(80,pps*1.4);layout();renderAll();};
+$("#zoomOut").onclick=()=>{pps=Math.max(2,pps/1.4);layout();renderAll();};
+
+/* ---- add overlays ---- */
+$("#addText").onclick=()=>{
+  const t=clampT(vid.currentTime);
+  S.overlays.push({type:"text",id:"t"+(uid++),text:"Text",x:760,y:480,size:64,color:"#ffffff",start:t,end:Math.min(S.duration,t+3)});
+  selId=S.overlays[S.overlays.length-1].id; renderAll();
+};
+$("#addImage").onclick=()=>$("#imgFile").click();
+$("#imgFile").onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const url=URL.createObjectURL(f); const im=new Image();
+  im.onload=()=>{
+    const t=clampT(vid.currentTime); const w=480, ratio=im.naturalHeight/im.naturalWidth;
+    S.overlays.push({type:"image",id:"i"+(uid++),file:f,url,ratio,x:720,y:300,w,start:t,end:Math.min(S.duration,t+5)});
+    selId=S.overlays[S.overlays.length-1].id; renderAll();
+  };
+  im.src=url; e.target.value="";
+};
+const clampT=t=>Math.max(0,Math.min(S.duration-0.1,t));
+
+/* ---- layout sizing ---- */
+function layout(){ tlinner.style.width=(S.duration*pps)+"px"; }
+const x2t=x=>x/pps, t2x=t=>t*pps;
+
+/* ---- render everything ---- */
+function renderAll(){ renderRuler(); renderTrim(); renderCuts(); renderClips(); renderStage(); movePlayhead(); renderInspector(); }
+
+function renderRuler(){
+  const r=$("#ruler"); r.innerHTML="";
+  let step=1; const targets=[1,2,5,10,15,30,60,120,300];
+  for(const s of targets){ if(s*pps>=60){step=s;break;} step=s; }
+  for(let t=0;t<=S.duration;t+=step){
+    const d=document.createElement("div"); d.className="tick"; d.style.left=t2x(t)+"px"; d.textContent=fmt(t).replace(/\.0$/,""); r.appendChild(d);
+  }
+}
+function renderTrim(){
+  $("#trimL").style.left=t2x(S.trim.start)+"px";
+  $("#trimR").style.left=(t2x(S.trim.end)-10)+"px";
+  $("#dimL").style.left="0px"; $("#dimL").style.width=t2x(S.trim.start)+"px";
+  $("#dimR").style.left=t2x(S.trim.end)+"px"; $("#dimR").style.right="0px"; $("#dimR").style.width="auto";
+  $("#dimR").style.left=t2x(S.trim.end)+"px";
+}
+function renderCuts(){
+  const c=$("#cuts"); c.innerHTML="";
+  S.cuts.forEach((cut,i)=>{
+    const d=document.createElement("div"); d.className="cutreg";
+    d.style.left=t2x(cut.start)+"px"; d.style.width=t2x(cut.end-cut.start)+"px";
+    const x=document.createElement("b"); x.textContent="×"; x.title="remove cut";
+    x.onclick=ev=>{ev.stopPropagation();S.cuts.splice(i,1);renderCuts();};
+    d.appendChild(x); c.appendChild(d);
+  });
+}
+function renderClips(){
+  const lane=$("#lane"); lane.innerHTML="";
+  S.overlays.forEach(o=>{
+    const c=document.createElement("div"); c.className="clip "+(o.type==="image"?"img":"")+(o.id===selId?" sel":"");
+    c.style.left=t2x(o.start)+"px"; c.style.width=Math.max(24,t2x(o.end-o.start))+"px";
+    c.textContent=o.type==="text"?("T "+o.text):("🖼 "+(o.file?o.file.name:"image"));
+    const el=document.createElement("div"),er=document.createElement("div");
+    el.className="e l"; er.className="e r"; c.appendChild(el); c.appendChild(er);
+    c.onpointerdown=ev=>{ if(ev.target===el||ev.target===er)return; selId=o.id; renderAll();
+      dragClip(ev,o,"move"); };
+    el.onpointerdown=ev=>{ev.stopPropagation();selId=o.id;dragClip(ev,o,"l");};
+    er.onpointerdown=ev=>{ev.stopPropagation();selId=o.id;dragClip(ev,o,"r");};
+    lane.appendChild(c);
+  });
+}
+function renderStage(){
+  stage.innerHTML="";
+  const sc=vscale(); const now=vid.currentTime;
+  S.overlays.forEach(o=>{
+    const active=now>=o.start&&now<=o.end;
+    if(!active&&o.id!==selId)return;
+    const b=document.createElement("div"); b.className="obox"+(o.id===selId?" sel":"");
+    b.style.left=(o.x/sc)+"px"; b.style.top=(o.y/sc)+"px";
+    if(o.type==="image"){ b.style.width=(o.w/sc)+"px"; b.style.height=(o.w*o.ratio/sc)+"px";
+      const img=document.createElement("img"); img.src=o.url; b.appendChild(img);
+    }else{
+      const span=document.createElement("div"); span.className="lbl"; span.textContent=o.text||" ";
+      span.style.fontSize=(o.size/sc)+"px"; span.style.color=o.color; b.appendChild(span);
+    }
+    const g=document.createElement("div"); g.className="grip"; b.appendChild(g);
+    b.onpointerdown=ev=>{ if(ev.target===g)return; selId=o.id; renderAll(); dragBox(ev,o); };
+    g.onpointerdown=ev=>{ev.stopPropagation();selId=o.id;resizeBox(ev,o);};
+    stage.appendChild(b);
+  });
+}
+function movePlayhead(){ $("#ph").style.left=t2x(vid.currentTime)+"px"; }
+
+function renderInspector(){
+  const ins=$("#insp"); ins.innerHTML="";
+  const o=S.overlays.find(x=>x.id===selId); if(!o){return;}
+  const mk=(lab,el)=>{const f=document.createElement("div");f.className="f";const l=document.createElement("label");l.textContent=lab;f.appendChild(l);f.appendChild(el);return f;};
+  if(o.type==="text"){
+    const ti=document.createElement("input");ti.type="text";ti.value=o.text;ti.style.width="220px";
+    ti.oninput=()=>{o.text=ti.value;renderStage();renderClips();}; ins.appendChild(mk("Text",ti));
+    const co=document.createElement("input");co.type="color";co.value=o.color;co.style.width="48px";co.style.height="38px";
+    co.oninput=()=>{o.color=co.value;renderStage();}; ins.appendChild(mk("Colour",co));
+    const sz=document.createElement("input");sz.type="number";sz.value=o.size;
+    sz.oninput=()=>{o.size=+sz.value||40;renderStage();}; ins.appendChild(mk("Size",sz));
+  }else{
+    const w=document.createElement("input");w.type="number";w.value=Math.round(o.w);
+    w.oninput=()=>{o.w=+w.value||100;renderStage();}; ins.appendChild(mk("Width px",w));
+  }
+  const del=document.createElement("button");del.className="sec";del.textContent="🗑 Delete";
+  del.onclick=()=>{S.overlays=S.overlays.filter(x=>x.id!==o.id);selId=null;renderAll();};
+  const wrap=document.createElement("div");wrap.className="f";wrap.appendChild(document.createElement("label"));wrap.appendChild(del);ins.appendChild(wrap);
+}
+
+/* ---- drag helpers ---- */
+function drag(ev,onMove,onUp){
+  ev.preventDefault();
+  const sx=ev.clientX,sy=ev.clientY;
+  const mv=e=>onMove(e.clientX-sx,e.clientY-sy);
+  const up=e=>{window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);if(onUp)onUp();};
+  window.addEventListener("pointermove",mv);window.addEventListener("pointerup",up);
+}
+function dragBox(ev,o){ const sc=vscale(),ox=o.x,oy=o.y;
+  drag(ev,(dx,dy)=>{o.x=Math.max(0,Math.min(1920-20,ox+dx*sc));o.y=Math.max(0,Math.min(1080-20,oy+dy*sc));renderStage();});
+}
+function resizeBox(ev,o){ const sc=vscale();
+  if(o.type==="image"){const ow=o.w;drag(ev,(dx)=>{o.w=Math.max(40,Math.min(1920,ow+dx*sc));renderStage();renderInspector();});}
+  else{const os=o.size;drag(ev,(dx,dy)=>{o.size=Math.max(12,Math.min(400,os+dy*sc));renderStage();renderInspector();});}
+}
+function dragClip(ev,o,mode){ const st=o.start,en=o.end,dur=en-st;
+  drag(ev,(dx)=>{const dt=x2t(dx);
+    if(mode==="move"){let s=Math.max(0,Math.min(S.duration-dur,st+dt));o.start=s;o.end=s+dur;}
+    else if(mode==="l"){o.start=Math.max(0,Math.min(o.end-0.2,st+dt));}
+    else{o.end=Math.min(S.duration,Math.max(o.start+0.2,en+dt));}
+    renderClips();},()=>renderStage());
+}
+
+/* ---- track interactions: trim handles, cut create, scrub ---- */
+function trackTime(clientX){const r=$("#vtrack").getBoundingClientRect();return Math.max(0,Math.min(S.duration,x2t(clientX-r.left)));}
+$("#trimL").onpointerdown=ev=>{ev.stopPropagation();const s0=S.trim.start;drag(ev,dx=>{S.trim.start=Math.max(0,Math.min(S.trim.end-0.5,s0+x2t(dx)));renderTrim();});};
+$("#trimR").onpointerdown=ev=>{ev.stopPropagation();const e0=S.trim.end;drag(ev,dx=>{S.trim.end=Math.min(S.duration,Math.max(S.trim.start+0.5,e0+x2t(dx)));renderTrim();});};
+
+// scrub: click or drag anywhere on the timeline (or drag the red handle) to
+// move the playhead to any second. Pause while dragging so playback can't fight
+// it; pointer capture keeps the drag working even outside the element.
+let scrubbing=false;
+function tlTime(clientX){
+  const dur=(S&&S.duration)||vid.duration||0;
+  const r=$("#vtrack").getBoundingClientRect();
+  return Math.max(0, Math.min(dur, (clientX-r.left)/pps));
+}
+function scrubTo(clientX){
+  const t=tlTime(clientX);
+  try{ vid.currentTime=t; }catch(e){}
+  $("#ph").style.left=(t*pps)+"px";
+  $("#clock").textContent=fmt(t);
+}
+function beginScrub(ev){
+  ev.preventDefault(); ev.stopPropagation();
+  scrubbing=true; const wasPlaying=!vid.paused; vid.pause();
+  scrubTo(ev.clientX);
+  const mv=e=>{e.preventDefault();scrubTo(e.clientX);};
+  const up=()=>{scrubbing=false;
+    window.removeEventListener("pointermove",mv,true);
+    window.removeEventListener("pointerup",up,true);
+    if(wasPlaying)vid.play();};
+  window.addEventListener("pointermove",mv,true);
+  window.addEventListener("pointerup",up,true);
+}
+$("#vtrack").onpointerdown=ev=>{
+  if(ev.target.classList.contains("handle")||ev.target.closest(".cutreg")||ev.target.id==="phGrab")return;
+  if(tool==="cut"){
+    const t0=tlTime(ev.clientX); const reg=document.createElement("div"); reg.className="cutreg"; $("#cuts").appendChild(reg);
+    drag(ev,dx=>{const tc=tlTime(ev.clientX+dx);const a=Math.min(t0,tc),b=Math.max(t0,tc);reg.style.left=t2x(a)+"px";reg.style.width=t2x(b-a)+"px";reg._a=a;reg._b=b;},
+      ()=>{const a=reg._a??t0,b=reg._b??t0;reg.remove();if(b-a>0.2){S.cuts.push({start:a,end:b});renderCuts();}});
+  }else{
+    beginScrub(ev);
+  }
+};
+$("#ruler").onpointerdown=beginScrub;
+$("#phGrab").onpointerdown=beginScrub;     // drag the red handle itself
+// keep the playhead under the cursor while scrubbing (don't let timeupdate fight it)
+vid.addEventListener("timeupdate",()=>{ if(scrubbing){ $("#ph").style.left=t2x(vid.currentTime)+"px"; } });
+window.addEventListener("resize",()=>{if(S)renderStage();});
+
+/* ---- APPLY ---- */
+$("#apply").onclick=async()=>{
+  $("#apply").disabled=true;$("#editPanel").hidden=false;$("#editResult").innerHTML="";
+  const texts=S.overlays.filter(o=>o.type==="text").map(o=>({text:o.text,start:+o.start.toFixed(2),end:+o.end.toFixed(2),x:Math.round(o.x),y:Math.round(o.y),size:Math.round(o.size),color:o.color}));
+  const images=S.overlays.filter(o=>o.type==="image");
+  const spec={trim:{start:+S.trim.start.toFixed(2),end:S.trim.end>=S.duration-0.05?null:+S.trim.end.toFixed(2)},
+    cuts:S.cuts.map(c=>({start:+c.start.toFixed(2),end:+c.end.toFixed(2)})),
+    mute_original:false, texts,
+    images:images.map(o=>({id:o.id,start:+o.start.toFixed(2),end:+o.end.toFixed(2),x:Math.round(o.x),y:Math.round(o.y),w:Math.round(o.w)})) };
+  const fd=new FormData();fd.append("spec",JSON.stringify(spec));
+  images.forEach(o=>fd.append(o.id,o.file));
+  const{id}=await(await fetch(`/api/jobs/${sourceJob}/edit`,{method:"POST",body:fd})).json();
+  pollJob(id,"e",j=>{
+    $("#apply").disabled=false;
+    $("#editResult").innerHTML=`<video controls style="width:100%;border-radius:10px" src="${j.download}"></video>
+      <div style="margin-top:8px"><a class="dl" href="${j.download}">⬇ Download</a>
+      <button class="sec" style="margin-left:8px" id="reedit">Edit this result again</button></div>`;
+    $("#reedit").onclick=()=>openEditor(id);
+  });
+};
+</script>
+</body>
+</html>
