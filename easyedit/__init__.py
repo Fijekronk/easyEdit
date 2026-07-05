@@ -1,2 +1,2 @@
-"""Boost video editing pipeline."""
+"""easyEdit video editing pipeline."""
 from .pipeline import run_pipeline  # noqa: F401

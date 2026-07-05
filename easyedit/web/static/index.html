@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Boost Video Editor</title>
+<title>easyEdit Video Editor</title>
 <style>
-  :root{--teal:#05a4ab;--navy:#16324f;--grey:#f2f5f7;--line:#d6dee6;--red:#e8554e;}
+  :root{--teal:#4f46e5;--navy:#1e293b;--grey:#f2f5f7;--line:#d6dee6;--red:#e8554e;}
   *{box-sizing:border-box;}
   body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--grey);color:var(--navy);}
   .wrap{max-width:1100px;margin:0 auto;padding:34px 18px 90px;}
@@ -72,8 +72,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Boost Video Editor</h1>
-  <p class="sub">Upload a raw Loom lesson → clean branded 1920×1080 video → visual editor.</p>
+  <h1>easyEdit Video Editor</h1>
+  <p class="sub">Upload a raw screen recording → clean 1920×1080 video → visual editor.</p>
 
   <!-- RENDER -->
   <div class="card" id="uploadCard">
@@ -85,7 +85,7 @@
       <span class="muted" id="encNote"></span>
     </div>
     <form id="form">
-      <label>Raw Loom video(s) — you can pick several; they render one by one</label>
+      <label>Raw screen recording(s) — you can pick several; they render one by one</label>
       <label class="drop" id="drop" for="file"><b>Click to choose</b> or drop .mp4 files here<div id="fname" class="muted"></div></label>
       <input type="file" id="file" accept="video/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;" />
       <button type="submit" id="go" class="big" disabled>Add to render queue</button>

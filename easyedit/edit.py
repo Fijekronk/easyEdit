@@ -1,15 +1,15 @@
 """
 ffmpeg / OpenCV editing stages.
 
-Pipeline (replaces the manual Premiere workflow described in the brief):
+Pipeline:
 
   1. clean_grey   - repaint Word/PDF grey background white (side margins AND the
                     scrolling page breaks) + normalise fps.  This single CV pass
-                    replaces the manual "mask + keyframe every page break" step.
-  2. composite    - background layer (scale 112, centred, toolbars cropped off),
-                    white fill, enlarged webcam bubble (scale 165, circular),
-                    robot mascot overlay, and Podcast-Voice-style audio cleanup.
-  3. make_intro   - generated title card (stand-in for SC Intro.mogrt).
+                    replaces manually masking and keyframing every page break.
+  2. composite    - background layer (scaled, centred, toolbars cropped off),
+                    white fill, enlarged circular webcam bubble, an optional
+                    mascot overlay, and optional audio cleanup.
+  3. make_intro   - generated title card (solid colour + title + optional brand).
   4. assemble     - intro -> body -> outro with cross-fades, exported 1920x1080.
 """
 from __future__ import annotations
@@ -80,9 +80,9 @@ def clean_grey(src: str, dst: str, fps: int = C.OUT_FPS,
     """Background-removal stage, parallelised across CPU cores.
 
     The video is split into time-segments, each processed by its own
-    `boost.segworker` process, then concatenated. Output is video-only (audio is
-    taken from the original source later in `composite`, which keeps A/V in sync
-    regardless of how the video segments are cut)."""
+    `easyedit.segworker` process, then concatenated. Output is video-only (audio
+    is taken from the original source later in `composite`, which keeps A/V in
+    sync regardless of how the video segments are cut)."""
     info = probe(src)
     w, h, duration = info["w"], info["h"], info["duration"]
 
@@ -97,7 +97,7 @@ def clean_grey(src: str, dst: str, fps: int = C.OUT_FPS,
     workers = workers or os.cpu_count() or 1
     workers = max(1, min(workers, int(duration // 8) or 1))   # >= ~8s per segment
 
-    tmp = tempfile.mkdtemp(prefix="boost_seg_")
+    tmp = tempfile.mkdtemp(prefix="easyedit_seg_")
     seg_dur = duration / workers
     segs, procs = [], []
     for i in range(workers):
@@ -106,7 +106,7 @@ def clean_grey(src: str, dst: str, fps: int = C.OUT_FPS,
         seg = os.path.join(tmp, f"seg{i:03d}.mp4")
         segs.append(seg)
         procs.append(subprocess.Popen(
-            [sys.executable, "-m", "boost.segworker", src, f"{start}", dur,
+            [sys.executable, "-m", "easyedit.segworker", src, f"{start}", dur,
              str(fps), str(w), str(h), box, seg],
             cwd=C.PROJECT_ROOT))
     for p in procs:
@@ -130,17 +130,17 @@ def clean_grey(src: str, dst: str, fps: int = C.OUT_FPS,
 
 
 # ---------------------------------------------------------------------------
-# Stage 2 - composite background + webcam + robot + audio
+# Stage 2 - composite background + webcam + optional mascot + audio
 # ---------------------------------------------------------------------------
 def composite(clean: str, cam_src: str, bubble: Bubble, dst: str) -> None:
     """Build the body: background (from `clean`, grey-removed + bubble painted),
-    enlarged circular webcam (cropped from `cam_src`, the untouched source),
-    robot overlay and Podcast-Voice audio."""
+    enlarged circular webcam (cropped from `cam_src`, the untouched source), an
+    optional mascot overlay, and the (optionally cleaned) audio."""
     info = probe(clean)
     sw, sh = info["w"], info["h"]
     OW, OH = C.OUT_W, C.OUT_H
 
-    # --- background layer geometry (scale 112, centred) ---
+    # --- background layer geometry (scaled, centred) ---
     bw, bh = round(sw * C.BG_SCALE), round(sh * C.BG_SCALE)
     bx, by = (OW - bw) / 2, (OH - bh) / 2
 
@@ -161,12 +161,18 @@ def composite(clean: str, cam_src: str, bubble: Bubble, dst: str) -> None:
     wcx, wcy = C.WEBCAM_OUT_X * OW, C.WEBCAM_OUT_Y * OH
     wx, wy = round(wcx - D / 2), round(wcy - D / 2)
 
-    # --- robot geometry ---
-    robot = cv2.imread(C.ASSETS.robot, cv2.IMREAD_UNCHANGED)
-    rh0, rw0 = robot.shape[:2]
-    rw, rh = round(rw0 * C.ROBOT_SCALE), round(rh0 * C.ROBOT_SCALE)
-    rcx, rcy = C.ROBOT_CENTER
-    rx, ry = round(rcx - rw / 2), round(rcy - rh / 2)
+    # --- optional mascot overlay ---
+    mascot_path = C.ASSETS.mascot
+    use_mascot = bool(mascot_path) and os.path.exists(mascot_path)
+
+    # inputs: 0=clean 1=white_bg 2=cam_src [3=mascot] then mask
+    inputs = ["-i", clean, "-i", C.ASSETS.white_bg, "-i", cam_src]
+    if use_mascot:
+        inputs += ["-i", mascot_path]
+        mask_idx = 4
+    else:
+        mask_idx = 3
+    inputs += ["-i", mfile]
 
     fc = (
         f"[1:v]scale={OW}:{OH},setsar=1[base0];"
@@ -174,28 +180,38 @@ def composite(clean: str, cam_src: str, bubble: Bubble, dst: str) -> None:
         f"[base0][bgv]overlay={bx}:{by}[bg];"
         f"[2:v]setpts=PTS-STARTPTS,crop={cside}:{cside}:{cx0}:{cy0},"
         f"scale={D}:{D},setsar=1[camraw];"
-        f"[4:v]format=gray,scale={D}:{D}[cmask];"
+        f"[{mask_idx}:v]format=gray,scale={D}:{D}[cmask];"
         f"[camraw][cmask]alphamerge[cam];"
         f"[bg][cam]overlay={wx}:{wy}[withcam];"
-        f"[3:v]scale={rw}:{rh}[robot];"
-        f"[withcam][robot]overlay={rx}:{ry}[outv];"
-        # audio from the ORIGINAL (input 2 = cam_src)
-        + (
-            # "Podcast Voice"-style cleanup: denoise, band-limit, compress, normalise
-            "[2:a]highpass=f=90,lowpass=f=12000,afftdn=nr=12,"
-            "acompressor=threshold=-18dB:ratio=3:attack=5:release=120,"
-            "loudnorm=I=-16:TP=-1.5:LRA=11[outa]"
-            if C.PROCESS_AUDIO else
-            # raw audio, untouched (just resampled for the container)
-            "[2:a]aresample=44100[outa]"
-        )
+    )
+
+    if use_mascot:
+        mascot = cv2.imread(mascot_path, cv2.IMREAD_UNCHANGED)
+        mh0, mw0 = mascot.shape[:2]
+        mw, mh = round(mw0 * C.MASCOT_SCALE), round(mh0 * C.MASCOT_SCALE)
+        mcx, mcy = C.MASCOT_CENTER
+        mx, my = round(mcx - mw / 2), round(mcy - mh / 2)
+        fc += (f"[3:v]scale={mw}:{mh}[mascot];"
+               f"[withcam][mascot]overlay={mx}:{my}[vout];")
+        vlabel = "vout"
+    else:
+        vlabel = "withcam"
+
+    # audio from the ORIGINAL (input 2 = cam_src)
+    fc += (
+        # denoise, band-limit, compress, loudness-normalise
+        "[2:a]highpass=f=90,lowpass=f=12000,afftdn=nr=12,"
+        "acompressor=threshold=-18dB:ratio=3:attack=5:release=120,"
+        "loudnorm=I=-16:TP=-1.5:LRA=11[outa]"
+        if C.PROCESS_AUDIO else
+        # raw audio, untouched (just resampled for the container)
+        "[2:a]aresample=44100[outa]"
     )
 
     _run([
         "ffmpeg", "-v", "error", "-y",
-        "-i", clean, "-i", C.ASSETS.white_bg, "-i", cam_src,
-        "-i", C.ASSETS.robot, "-i", mfile,
-        "-filter_complex", fc, "-map", "[outv]", "-map", "[outa]",
+        *inputs,
+        "-filter_complex", fc, "-map", f"[{vlabel}]", "-map", "[outa]",
         "-r", str(C.OUT_FPS),
         *C.final_codec_args(), "-c:a", "aac", "-b:a", "192k", dst,
     ])
@@ -203,11 +219,11 @@ def composite(clean: str, cam_src: str, bubble: Bubble, dst: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Stage 3 - intro title card (stand-in for SC Intro.mogrt)
+# Stage 3 - intro title card (solid colour + title + optional brand line)
 # ---------------------------------------------------------------------------
 def make_intro(title: str, dst: str, duration: float = C.INTRO_DURATION) -> None:
-    """Title card matching the SC Intro / SCI_FINAL look: teal background, the
-    lesson topic in white, "studyclix" beneath."""
+    """Title card: a solid background, the title in white, and — if EASYEDIT_BRAND
+    is set — a brand line beneath it."""
     OW, OH = C.OUT_W, C.OUT_H
 
     def esc(s: str) -> str:
@@ -219,13 +235,18 @@ def make_intro(title: str, dst: str, duration: float = C.INTRO_DURATION) -> None
     safe = esc(title)
 
     fc = (
-        f"color=c={C.INTRO_TEAL}:s={OW}x{OH}:r={C.OUT_FPS}:d={duration}[bg];"
+        f"color=c={C.INTRO_BG}:s={OW}x{OH}:r={C.OUT_FPS}:d={duration}[bg];"
         f"[bg]drawtext=fontfile='{FONT}':text='{safe}':fontcolor=white:"
         f"fontsize={fontsize}:x=(w-text_w)/2:y=h*0.40[t1];"
-        f"[t1]drawtext=fontfile='{FONT}':text='studyclix':fontcolor=white:"
-        f"fontsize=58:x=(w-text_w)/2:y=h*0.56[t2];"
-        f"[t2]fade=t=in:st=0:d=0.5,fade=t=out:st={duration-0.6}:d=0.6[outv]"
     )
+    last = "t1"
+    if C.BRAND_TEXT:
+        brand = esc(C.BRAND_TEXT)
+        fc += (f"[t1]drawtext=fontfile='{FONT}':text='{brand}':fontcolor=white:"
+               f"fontsize=58:x=(w-text_w)/2:y=h*0.56[t2];")
+        last = "t2"
+    fc += f"[{last}]fade=t=in:st=0:d=0.5,fade=t=out:st={duration-0.6}:d=0.6[outv]"
+
     _run([
         "ffmpeg", "-v", "error", "-y",
         "-f", "lavfi", "-i", f"anullsrc=r=44100:cl=stereo:d={duration}",
@@ -264,7 +285,7 @@ def _normalize(src: str, dst: str) -> None:
 # Stage 4 - assemble intro -> body -> outro with cross-fades
 # ---------------------------------------------------------------------------
 def assemble(intro: str, body: str, outro_src: str, dst: str, xfade: float = 0.6) -> None:
-    tmp = tempfile.mkdtemp(prefix="boost_")
+    tmp = tempfile.mkdtemp(prefix="easyedit_")
     outro = os.path.join(tmp, "outro_norm.mp4")
     _normalize(outro_src, outro)
 

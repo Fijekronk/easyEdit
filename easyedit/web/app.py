@@ -1,13 +1,13 @@
 """
-FastAPI web front-end for the Boost editing pipeline.
+FastAPI web front-end for the easyEdit editing pipeline.
 
-Upload a raw Loom mp4 + a title -> the job is queued, processed by the pipeline,
+Upload a raw screen-recording mp4 + a title -> the job is queued, processed by the pipeline,
 and the finished 1920x1080 video can be downloaded.  A single background worker
 processes jobs sequentially (video editing is CPU-heavy; one at a time is right
 for a test deployment).
 
 Run with:
-    uvicorn boost.web.app:app --reload --port 8000
+    uvicorn easyedit.web.app:app --reload --port 8000
 """
 from __future__ import annotations
 
@@ -47,10 +47,10 @@ _GPU_OK = _gpu_available()
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HERE, "static")
-DATA = os.path.join(tempfile.gettempdir(), "boost_jobs")
+DATA = os.path.join(tempfile.gettempdir(), "easyedit_jobs")
 os.makedirs(DATA, exist_ok=True)
 
-app = FastAPI(title="Boost Video Editor")
+app = FastAPI(title="easyEdit Video Editor")
 # ONE worker: each video is processed on all CPU cores, jobs run one-by-one.
 _executor = ThreadPoolExecutor(max_workers=1)
 _lock = threading.Lock()

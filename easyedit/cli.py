@@ -1,8 +1,8 @@
-"""Command-line entry point for the Boost pipeline.
+"""Command-line entry point for the easyEdit pipeline.
 
 Usage:
-    python -m boost.cli "input.mp4" --title "Lesson Title" --out ./output
-    python -m boost.cli "input.mp4" --title "Test" --out ./output --clip 20
+    python -m easyedit.cli "input.mp4" --title "Lesson Title" --out ./output
+    python -m easyedit.cli "input.mp4" --title "Test" --out ./output --clip 20
 """
 from __future__ import annotations
 
@@ -16,9 +16,9 @@ from .pipeline import run_pipeline
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Boost lesson video editor")
-    ap.add_argument("input", help="raw Loom mp4")
-    ap.add_argument("--title", required=True, help="lesson title (used in intro + filename)")
+    ap = argparse.ArgumentParser(description="easyEdit screen-recording video editor")
+    ap.add_argument("input", help="raw screen-recording mp4")
+    ap.add_argument("--title", required=True, help="title (used in intro + filename)")
     ap.add_argument("--out", default="./output", help="output directory")
     ap.add_argument("--clip", type=float, default=0,
                     help="process only the first N seconds (quick test)")

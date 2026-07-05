@@ -1,7 +1,7 @@
 """
 Computer-vision detectors used by the pipeline.
 
-  * detect_webcam_bubble  -> locate the circular Loom webcam in the source frame
+  * detect_webcam_bubble  -> locate the circular webcam bubble in the source frame
   * grey_to_white_mask    -> boolean mask of Word/PDF grey background pixels
   * remove_grey           -> repaint grey pixels white (in place)
 """

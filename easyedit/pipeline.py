@@ -1,4 +1,4 @@
-"""End-to-end orchestration of the Boost editing pipeline."""
+"""End-to-end orchestration of the easyEdit editing pipeline."""
 from __future__ import annotations
 
 import os
@@ -33,20 +33,23 @@ def run_pipeline(
         make_intro = C.ADD_INTRO
     if make_outro is None:
         make_outro = C.ADD_OUTRO
+    # the outro is optional — only append it if an outro clip is actually provided
+    if make_outro and not (C.ASSETS.outro and os.path.exists(C.ASSETS.outro)):
+        make_outro = False
 
     def report(msg: str, frac: float) -> None:
         if progress:
             progress(msg, frac)
 
     os.makedirs(out_dir, exist_ok=True)
-    work = work_dir or tempfile.mkdtemp(prefix="boost_work_")
+    work = work_dir or tempfile.mkdtemp(prefix="easyedit_work_")
     os.makedirs(work, exist_ok=True)
 
     clean = os.path.join(work, "clean.mp4")
     body = os.path.join(work, "body.mp4")
     cut = os.path.join(work, "cut.mp4")
     intro = os.path.join(work, "intro.mp4")
-    safe_name = "".join(c for c in title if c.isalnum() or c in " -_").strip() or "boost"
+    safe_name = "".join(c for c in title if c.isalnum() or c in " -_").strip() or "easyedit"
     final = os.path.join(out_dir, f"{safe_name}.mp4")
 
     # Optional pre-step: cut out silent dead time (scroll-throughs, long pauses).

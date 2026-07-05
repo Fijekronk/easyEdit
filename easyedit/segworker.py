@@ -1,7 +1,7 @@
 """
 Per-segment background-removal worker (one OS process per CPU core).
 
-Run as:  python -m boost.segworker <src> <start> <dur|-> <fps> <w> <h> <box|-> <out>
+Run as:  python -m easyedit.segworker <src> <start> <dur|-> <fps> <w> <h> <box|-> <out>
   box = "x0,y0,x1,y1" white-fill rectangle (original webcam), or "-" for none.
 
 Launched by edit.clean_grey to parallelise the (single-threaded) OpenCV pass

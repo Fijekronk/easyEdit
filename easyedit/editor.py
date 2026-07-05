@@ -1,7 +1,7 @@
 """
 Minimal in-browser editor render backend.
 
-Takes a rendered Boost video plus an "edit spec" and produces a new video.
+Takes a rendered easyEdit video plus an "edit spec" and produces a new video.
 Supported operations (a minimal montage):
 
   * trim          keep only [start, end]
@@ -192,7 +192,7 @@ def render_edit(src: str, spec: dict, assets: Dict[str, str], dst: str,
         if progress:
             progress(m, f)
 
-    work_dir = tempfile.mkdtemp(prefix="boost_edit_")
+    work_dir = tempfile.mkdtemp(prefix="easyedit_edit_")
     has_overlays = bool(spec.get("texts") or spec.get("images")
                         or spec.get("audios") or spec.get("mute_original"))
 
