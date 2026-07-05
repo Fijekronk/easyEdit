@@ -124,4 +124,3 @@ page breaks, the top toolbar, and dark UI dropdowns (e.g. the "Draw" panel).
   pass stays multi-core CPU (its encode is negligible and dozens of parallel
   NVENC sessions would exceed the GPU limit). So GPU mode is a partial speed-up,
   not a full one — the OpenCV background pass is CPU either way.
-```
